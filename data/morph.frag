@@ -3,7 +3,7 @@ precision mediump float;
 precision mediump int;
 #endif
 
-//#define PROCESSING_TEXTURE_SHADER
+#define PROCESSING_TEXTURE_SHADER
 
 uniform sampler2D texture;
 
@@ -28,11 +28,18 @@ vec3 compute_bary_coords(vec2 p, vec2 c0, vec2 c1, vec2 c2) {
   return bary_coords;
 }
 
+// flip horizontally
+vec2 flip_vec (vec2 v) {
+  return (vec2 (0.0, 1.0) - v) * vec2(-1.0, 1.0);
+}
+
 void main(void) {
 
-  // normalize tex coords to [0, 1]
+  // normalize tex coords to [0, 1] with BL origin
   vec2 tc_norm = vertTexCoord.st;
-  tc_norm = (vec2 (0.0, 1.0) - tc_norm) * vec2(-1.0, 1.0);
+
+  // flip tex coords along y axis
+  tc_norm = flip_vec(tc_norm);
 
   // points of triangle
   vec2 p0, p1, p2;
@@ -66,12 +73,8 @@ void main(void) {
   vec3 xVec = vec3 (p0.x, p1.x, p2.x);
   vec3 yVec = vec3 (p0.y, p1.y, p2.y);
   vec2 warped_tex_coords = vec2 (dot(xVec, bary_coords), dot(yVec, bary_coords));
-  //warped_tex_coords_norm.y = 1.0 - warped_tex_coords_norm.y;
-  //vec2 warped_tex_coords = warped_tex_coords_norm * resolution;
+  warped_tex_coords = flip_vec (warped_tex_coords);
 
-  gl_FragColor = texture2D(texture, warped_tex_coords) * vertColor;
-  //gl_FragColor = texture2D(texture, vertTexCoord.st) * vertColor;
-  //gl_FragColor = texture2D(texture, st) * vertColor;
-
-  //gl_FragColor = vec4(1.0*vertTexCoord.t, 0.0, 0.0, 1.0);
+  vec4 adj_clr = vec4(1.0 * tc_norm.s * tc_norm.t, 1.0*tc_norm.s, 1.0*tc_norm.t, 1.0);
+  gl_FragColor = texture2D(texture, warped_tex_coords) * adj_clr;
 }

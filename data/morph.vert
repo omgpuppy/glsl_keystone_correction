@@ -16,6 +16,5 @@ varying vec4 vertTexCoord;
 void main() {
   gl_Position = transform * vertex;
   vertColor = color;
-  //vertTexCoord = texMatrix * vec4(texCoord, 1.0, 1.0);
-  vertTexCoord = vec4(texCoord, 1.0, 1.0);
+  vertTexCoord = texMatrix * vec4(texCoord, 1.0, 1.0);
 }

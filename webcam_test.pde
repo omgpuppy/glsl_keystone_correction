@@ -1,6 +1,6 @@
 import processing.video.*;
 
-boolean DO_CAPTURE = true;
+boolean DO_CAPTURE = false;
 
 PImage img;
 Capture cam;
@@ -76,7 +76,7 @@ void draw() {
   image(px_src, dx, dy, w, h);
 
   //morph.set("time", millis() / 1000.0);
-  morph.set("texture", cam);
+  morph.set("texture", px_src);
   morph.set("resolution", float(px_src.width), float(px_src.height));
 
 //  morph.set("TL", 0.0, 0.0);
@@ -85,17 +85,17 @@ void draw() {
 //  morph.set("TR", 1.0, 0.0);
 
   PVector p = keyGlyph.points.get(0).get();
-  morph.set("TL", p.x, p.y);
-  p = keyGlyph.points.get(1).get();
   morph.set("BL", p.x, p.y);
-  p = keyGlyph.points.get(2).get();
+  p = keyGlyph.points.get(1).get();
   morph.set("BR", p.x, p.y);
-  p = keyGlyph.points.get(3).get();
+  p = keyGlyph.points.get(2).get();
   morph.set("TR", p.x, p.y);
+  p = keyGlyph.points.get(3).get();
+  morph.set("TL", p.x, p.y);
 
 
   shader(morph);
-  image(DO_CAPTURE ? cam : img, (width/2.0)+dx, dy, w, h);
+  image(px_src, (width/2.0)+dx, dy, w, h);
 
   resetShader();
   keyGlyph.display();
