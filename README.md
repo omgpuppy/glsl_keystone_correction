@@ -22,3 +22,5 @@ The UP and DOWN arrows will increase the resolution of the mesh used to warp the
 The warping is accomplished by mapping a triangular mesh over the warped image and the keystone bounding quad. The individual pixels are then interpolated using barycentric coordinates in a fragment shader.
 
 This approach does not actually correct for perspective distortion, but does an adequate job for small. OpenCV and similar libraries provide methods for calculating the perspective transformation from the set of 4 points forming the keystone boundary. This matrix only needs to be calculated when the keystone boundaries change.
+
+![sample image used to warp](data/checkers.png "Optional title")
