@@ -1,14 +1,19 @@
 import processing.video.*;
 
-boolean DO_CAPTURE = true;
+// Set this to false if you don't have a webcam installed.
+// A default image will be used instead.
+boolean DO_CAPTURE = false; 
 
-PImage img;
 Capture cam;
+PImage img;
+boolean camera_found = false;
 
+// Shader for keystone correctionpx
 PShader morph;
 PVector TL, BL, BR, TR;
 int tri_levels;
 
+// Widget for setting the bounding area of the keystoned object
 KeystoneGlyph keyGlyph;
 
 void setup() {
@@ -20,8 +25,8 @@ void setup() {
 
     if (cameras.length == 0) {
       println("There are no cameras available for capture.");
-      exit();
     } else {
+      camera_found = true;
       println("Available cameras:");
       for (int i = 0; i < cameras.length; i++) {
         println(cameras[i]);
@@ -34,8 +39,8 @@ void setup() {
     }
   }
 
-  if (! DO_CAPTURE)
-    img = loadImage ("/Users/abrowning/Desktop/silly/ab-glam-shot.png");
+  if (! DO_CAPTURE || ! camera_found)
+    img = loadImage ("checkers.png");
 
   tri_levels = 0;
   morph = loadShader("morph.frag", "morph.vert");
@@ -56,13 +61,13 @@ void setup() {
 void draw() {
   background (0);
 
-  if (DO_CAPTURE) {
+  if (DO_CAPTURE && camera_found) {
     if (cam.available() == true) {
       cam.read();
     }
   }
 
-  PImage px_src = DO_CAPTURE ? cam : img;
+  PImage px_src = (DO_CAPTURE && camera_found) ? cam : img;
   float half_screen_asp = (width/2.0) / (float)height; 
   float asp = half_screen_asp;
   if (px_src.width > 0 && px_src.height > 0)
@@ -156,7 +161,7 @@ void resetCalibration() {
 }
 
 void saveCalibration() {
-    // write out calibration file
+  // write out calibration file
   String[] corners = new String[8];
   int i = 0;
   for (PVector p : keyGlyph.points) {
