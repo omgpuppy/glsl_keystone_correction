@@ -1,20 +1,26 @@
+
 import processing.video.*;
 
 // Set this to false if you don't have a webcam installed.
 // A default image will be used instead.
 boolean DO_CAPTURE = false; 
 
+// Camera or image source to be corrected
 Capture cam;
 PImage img;
 boolean camera_found = false;
 
-// Shader for keystone correctionpx
+// Shader for keystone correction
 PShader morph;
 PVector TL, BL, BR, TR;
 int tri_levels;
 
 // Widget for setting the bounding area of the keystoned object
 KeystoneGlyph keyGlyph;
+
+// debugging visualization of triangular warping mesh
+TriMesh triSrc, triDest;
+boolean show_debug_mesh = true;
 
 void setup() {
   size(1400, 800, P2D);
@@ -47,15 +53,25 @@ void setup() {
   morph.set("tri_levels", tri_levels);
 
   keyGlyph = new KeystoneGlyph ();
-  
+
   println ("loading calibration data");
   String[] corners = loadStrings("calib.txt");
   for (int i = 0, j = 0; i < corners.length; i+=2, j++) {
     float x = Float.valueOf(corners[i]).floatValue();
     float y = Float.valueOf(corners[i+1]).floatValue();
     println (" ["+j+"] : "+x+", "+y);
-    keyGlyph.points.set(j, new PVector (x,y));
+    keyGlyph.points.set(j, new PVector (x, y));
   }
+
+  triSrc = new TriMesh ();
+  triSrc.set_lod(tri_levels);
+  triSrc.set_corners(keyGlyph.points.get(0), 
+  keyGlyph.points.get(1), 
+  keyGlyph.points.get(2), 
+  keyGlyph.points.get(3));
+
+  triDest = new TriMesh ();
+  triDest.set_lod(tri_levels);
 }
 
 void draw() {
@@ -96,10 +112,10 @@ void draw() {
   morph.set("texture", px_src);
   //morph.set("resolution", float(px_src.width), float(px_src.height));
 
-//  morph.set("TL", 0.0, 0.0);
-//  morph.set("BL", 0.0, 1.0);
-//  morph.set("BR", 1.0, 1.0);
-//  morph.set("TR", 1.0, 0.0);
+  //  morph.set("TL", 0.0, 0.0);
+  //  morph.set("BL", 0.0, 1.0);
+  //  morph.set("BR", 1.0, 1.0);
+  //  morph.set("TR", 1.0, 0.0);
 
   PVector p = keyGlyph.points.get(0).get();
   morph.set("BL", p.x, p.y);
@@ -110,13 +126,21 @@ void draw() {
   p = keyGlyph.points.get(3).get();
   morph.set("TL", p.x, p.y);
 
-
   shader(morph);
   image(px_src, (width/2.0)+dx, dy, w, h);
 
   resetShader();
   keyGlyph.display();
-  
+
+  if (show_debug_mesh) {
+    triSrc.set_pos(new PVector (w/2.0+dx, h/2.0+dy));
+    triSrc.set_size(w, h);
+    triSrc.display();
+    triDest.set_pos(new PVector ((width/2.0)+w/2.0+dx, h/2.0+dy));
+    triDest.set_size(w, h);
+    triDest.display();
+  }
+
   text (frameRate, 10, 20);
 }
 
@@ -129,7 +153,7 @@ void mousePressed() {
 void mouseReleased() {
   println("UP");
   grabbed = -1;
-  saveCalibration();  
+  saveCalibration();
 }
 
 void mouseDragged() {
@@ -138,25 +162,35 @@ void mouseDragged() {
   p.add(new PVector (mouseX-pmouseX, mouseY-pmouseY));
   p = keyGlyph.get_norm_pos(p);
   keyGlyph.points.set(grabbed, p);
+  push_corners();
 }
 
 void keyPressed() {
-  if (keyCode == UP)
+  if (keyCode == UP) {
     tri_levels++;
-  else if (keyCode == DOWN) {
-    if (tri_levels > 0)
+    triSrc.set_lod(tri_levels);
+    triDest.set_lod(tri_levels);
+    morph.set("tri_levels", tri_levels);
+  } else if (keyCode == DOWN) {
+    if (tri_levels > 0) {
       tri_levels--;
+      triSrc.set_lod(tri_levels);
+      triDest.set_lod(tri_levels);
+      morph.set("tri_levels", tri_levels);
+    }
   } else if (key == 'r') {
     resetCalibration();
+  } else if (key == 'm') {
+    show_debug_mesh = !show_debug_mesh;
   }
-  morph.set("tri_levels", tri_levels);
 }
 
 void resetCalibration() {
-  keyGlyph.points.set(0, new PVector (0,0));
-  keyGlyph.points.set(1, new PVector (1,0));
-  keyGlyph.points.set(2, new PVector (1,1));
-  keyGlyph.points.set(3, new PVector (0,1));
+  keyGlyph.points.set(0, new PVector (0, 0));
+  keyGlyph.points.set(1, new PVector (1, 0));
+  keyGlyph.points.set(2, new PVector (1, 1));
+  keyGlyph.points.set(3, new PVector (0, 1));
+  push_corners ();
   saveCalibration();
 }
 
@@ -170,3 +204,8 @@ void saveCalibration() {
   }
   saveStrings ("calib.txt", corners);
 }
+
+void push_corners() {
+  triSrc.set_corners(keyGlyph.points.get(0), keyGlyph.points.get(1), keyGlyph.points.get(2), keyGlyph.points.get(3));
+}
+

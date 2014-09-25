@@ -13,6 +13,8 @@ Drag the corners of the keystone widget in the left video feed to fit over the r
 
 Press 'r' to reset the keystone widget to contain the entire image.
 
+Press 'm' to toggle the mesh visualization overlay.
+
 The UP and DOWN arrows will increase the resolution of the mesh used to warp the image.
 
 ## Notes ##

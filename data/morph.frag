@@ -4,11 +4,9 @@ precision mediump int;
 #endif
 
 #define PROCESSING_TEXTURE_SHADER
+//#define DEBUG_MESH_RESOLUTION
 
 uniform sampler2D texture;
-
-//uniform float time;
-//uniform dvec2 resolution;
 
 uniform vec2 TL;
 uniform vec2 BL;
@@ -212,12 +210,14 @@ void main(void) {
   vec2 warped_tex_coords = vec2 (dot(xVec, bary_coords), dot(yVec, bary_coords));
   warped_tex_coords = flip_vec (warped_tex_coords);
 
+  // debugging to tease apart Processing's inverted y axis nonsense...
   vec4 adj_clr = vec4(1.0 * tc_norm.s * tc_norm.t, 1.0*tc_norm.s, 1.0*tc_norm.t, 1.0);
   adj_clr = vec4 (1.0);
 
   gl_FragColor = texture2D(texture, warped_tex_coords) * adj_clr;
 
-  // debugging to see which level is selected (i.e. visualize our grid resolution)
+#ifdef DEBUG_MESH_RESOLUTION
   if (selA == ivec3 (1,1,1))
-    gl_FragColor = mix(gl_FragColor, vec4 (0.0, 1.0, 0.0, 1.0), 0.25);
+    gl_FragColor = mix (gl_FragColor, vec4 (0,1,0,1), 0.25);
+#endif
 }
