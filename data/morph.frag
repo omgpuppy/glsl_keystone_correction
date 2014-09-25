@@ -35,6 +35,7 @@ vec2 flip_vec (vec2 v) {
   return (vec2 (0.0, 1.0) - v) * vec2(-1.0, 1.0);
 }
 
+// integer exponentiation base ^ pwr
 int i_pow (int base, int pwr) {
   int oot = 1;
   for (int i = 0; i < pwr; i++)
@@ -42,20 +43,30 @@ int i_pow (int base, int pwr) {
   return oot;
 }
 
-vec3 cross2 (vec2 a, vec2 b) {
-  return cross (vec3 (a.x, a.y, 0.0), vec3 (b.x, b.y, 0.0));
+// 2D cross product
+float cross2 (vec2 a, vec2 b) {
+  return cross (vec3 (a.x, a.y, 0.0), vec3 (b.x, b.y, 0.0)).z;
 }
 
+// intersection of 2 lines A & B given by 2 points on each
 vec2 intersect (vec2 a0, vec2 a1, vec2 b0, vec2 b1) {
   vec2 p = a0;
   vec2 r = a1 - a0;
   vec2 q = b0;
   vec2 s = b1 - b0;
-  float t = (cross2((q - p), s)).z / (cross2(r, s)).z;
+  float t = cross2((q - p), s) / cross2(r, s);
   return p + t * r;
 }
 
-void get_wedge (int level, vec2 p, vec2 ori, vec2 ext,
+
+// multi-resolution triangular grid sampling
+//  - binary division of quadrilateral formed by [_BL,_BR,_TR,_TL]
+//  - p is UV sample point for which you want the point of the intersected triangle
+//  - ori, exp define UV boundary of quad
+//  - selected gives indecies for sub-quad & sub-triangle for the found triangle
+void get_wedge (int level,
+                vec2 p,
+                vec2 ori, vec2 ext,
                 vec2 _BL, vec2 _BR, vec2 _TR, vec2 _TL,
                 out vec2 p0, out vec2 p1, out vec2 p2,
                 out ivec3 selected) {
@@ -85,10 +96,7 @@ void get_wedge (int level, vec2 p, vec2 ori, vec2 ext,
 
         vec2 TTR = _TL + 0.5 * (_TR - _TL);
         vec2 RTR = _BR + 0.5 * (_TR - _BR);
-        //new_TR = intersect (new_BR, TTR, new_TL, RTR);
-
-        new_TR = new_BR + 0.5 * (TTR - new_BR);
-        //new_TR = new_TL + 0.5 * (_BR - _BL);
+        new_TR = intersect (new_BR, TTR, new_TL, RTR);
       } else {                 // up
 
         yy += jumps_per_div;
@@ -102,10 +110,7 @@ void get_wedge (int level, vec2 p, vec2 ori, vec2 ext,
 
         vec2 BBR = _BL + 0.5 * (_BR - _BL);
         vec2 RBR = _TR + 0.5 * (_BR - _TR);
-        //new_BR = intersect (new_BL, RBR, new_TL, BBR);
-
-        new_BR = new_TR + 0.5 * (BBR - new_TR);
-        //new_BR = new_TR + 0.5 * (_BL - _TL);
+        new_BR = intersect (new_BL, RBR, new_TR, BBR);
       }
     } else {                   // right
 
@@ -120,10 +125,7 @@ void get_wedge (int level, vec2 p, vec2 ori, vec2 ext,
 
         vec2 TTL = _TR + 0.5 * (_TL - _TR);
         vec2 LTL = _BL + 0.5 * (_TL - _BL);
-        //new_TL = intersect (new_TR, LTL, new_BL, TTL);
-
-        new_TL = new_BL + 0.5 * (TTL - new_BL);
-        //new_TL = new_BL + 0.5 * (_TR - _BR);
+        new_TL = intersect (new_TR, LTL, new_BL, TTL);
       } else {                 // up
 
         yy += jumps_per_div;
@@ -136,11 +138,7 @@ void get_wedge (int level, vec2 p, vec2 ori, vec2 ext,
 
         vec2 BBL = _BR + 0.5 * (_BL - _BR);
         vec2 LBL = _TL + 0.5 * (_BL - _TL);
-        //new_BL = intersect (new_BR, LBL, new_TL, BBL);
-
-        new_BL = new_TL + 0.5 * (BBL - new_TL);
-
-        //new_BL = new_TL + 0.5 * (_BR - _TR);
+        new_BL = intersect (new_BR, LBL, new_TL, BBL);
       }
     }
 
@@ -171,12 +169,21 @@ void get_wedge (int level, vec2 p, vec2 ori, vec2 ext,
   return;
 }
 
+// convenience version that starts the origin & extent UVs at [0,0] & [1,1]
+void get_wedge (int level, vec2 p,
+                vec2 _BL, vec2 _BR, vec2 _TR, vec2 _TL,
+                out vec2 p0, out vec2 p1, out vec2 p2,
+                out ivec3 selected) {
+  get_wedge (level, p, vec2(0,0), vec2(1,1), _BL, _BR, _TR, _TL, p0, p1, p2, selected);
+}
+
+
 void main(void) {
 
   // normalize tex coords to [0, 1] with BL origin
   vec2 tc_norm = vertTexCoord.st;
 
-  // flip tex coords along y axis
+  // flip tex coords along y axis (ugh...Processing coordinate frame...)
   tc_norm = flip_vec(tc_norm);
 
   // points of interpolating triangle
@@ -185,8 +192,8 @@ void main(void) {
   ivec3 selA, selB;
 
   // get triangle we're interpolating
-  get_wedge (tri_levels, tc_norm, vec2(0.0,0.0), vec2(1.0, 1.0),
-             vec2(0.0,0.0), vec2(1.0,0.0), vec2(1.0,1.0), vec2(0.0,1.0),
+  get_wedge (tri_levels, tc_norm,
+             vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1),
              p0, p1, p2,
              selA);
 
@@ -194,7 +201,7 @@ void main(void) {
   vec3 bary_coords = compute_bary_coords (tc_norm, p0, p1, p2);
 
   // get corresponding triangle in warped quadrilateral
-  get_wedge (tri_levels, tc_norm, vec2(0.0,0.0), vec2(1.0, 1.0),
+  get_wedge (tri_levels, tc_norm,
              BL, BR, TR, TL,
              p0, p1, p2,
              selB);
@@ -208,10 +215,9 @@ void main(void) {
   vec4 adj_clr = vec4(1.0 * tc_norm.s * tc_norm.t, 1.0*tc_norm.s, 1.0*tc_norm.t, 1.0);
   adj_clr = vec4 (1.0);
 
-  if (selA != selB)
-    gl_FragColor = vec4 (1.0, 0.0, 0.0, 1.0);
-  else if (selA == ivec3 (1,1,1))
-    gl_FragColor = vec4 (0.0, 1.0, 0.0, 1.0);
-  else
-    gl_FragColor = texture2D(texture, warped_tex_coords) * adj_clr;
+  gl_FragColor = texture2D(texture, warped_tex_coords) * adj_clr;
+
+  // debugging to see which level is selected (i.e. visualize our grid resolution)
+  if (selA == ivec3 (1,1,1))
+    gl_FragColor = mix(gl_FragColor, vec4 (0.0, 1.0, 0.0, 1.0), 0.25);
 }

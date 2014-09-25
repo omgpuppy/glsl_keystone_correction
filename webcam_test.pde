@@ -111,6 +111,8 @@ void draw() {
 
   resetShader();
   keyGlyph.display();
+  
+  text (frameRate, 10, 20);
 }
 
 int grabbed = -1;
@@ -122,15 +124,7 @@ void mousePressed() {
 void mouseReleased() {
   println("UP");
   grabbed = -1;
-  
-  // write out calibration file
-  String[] corners = new String[8];
-  int i = 0;
-  for (PVector p : keyGlyph.points) {
-    corners[i++] = Float.toString(p.x);
-    corners[i++] = Float.toString(p.y);
-  }
-  saveStrings ("calib.txt", corners);
+  saveCalibration();  
 }
 
 void mouseDragged() {
@@ -147,6 +141,27 @@ void keyPressed() {
   else if (keyCode == DOWN) {
     if (tri_levels > 0)
       tri_levels--;
+  } else if (key == 'r') {
+    resetCalibration();
   }
   morph.set("tri_levels", tri_levels);
+}
+
+void resetCalibration() {
+  keyGlyph.points.set(0, new PVector (0,0));
+  keyGlyph.points.set(1, new PVector (1,0));
+  keyGlyph.points.set(2, new PVector (1,1));
+  keyGlyph.points.set(3, new PVector (0,1));
+  saveCalibration();
+}
+
+void saveCalibration() {
+    // write out calibration file
+  String[] corners = new String[8];
+  int i = 0;
+  for (PVector p : keyGlyph.points) {
+    corners[i++] = Float.toString(p.x);
+    corners[i++] = Float.toString(p.y);
+  }
+  saveStrings ("calib.txt", corners);
 }
