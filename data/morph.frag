@@ -7,13 +7,15 @@ precision mediump int;
 
 uniform sampler2D texture;
 
-uniform float time;
-uniform vec2 resolution;
+//uniform float time;
+//uniform dvec2 resolution;
 
 uniform vec2 TL;
 uniform vec2 BL;
 uniform vec2 BR;
 uniform vec2 TR;
+
+uniform int tri_levels;
 
 varying vec4 vertColor;
 varying vec4 vertTexCoord;
@@ -33,6 +35,142 @@ vec2 flip_vec (vec2 v) {
   return (vec2 (0.0, 1.0) - v) * vec2(-1.0, 1.0);
 }
 
+int i_pow (int base, int pwr) {
+  int oot = 1;
+  for (int i = 0; i < pwr; i++)
+    oot *= base;
+  return oot;
+}
+
+vec3 cross2 (vec2 a, vec2 b) {
+  return cross (vec3 (a.x, a.y, 0.0), vec3 (b.x, b.y, 0.0));
+}
+
+vec2 intersect (vec2 a0, vec2 a1, vec2 b0, vec2 b1) {
+  vec2 p = a0;
+  vec2 r = a1 - a0;
+  vec2 q = b0;
+  vec2 s = b1 - b0;
+  float t = (cross2((q - p), s)).z / (cross2(r, s)).z;
+  return p + t * r;
+}
+
+void get_wedge (int level, vec2 p, vec2 ori, vec2 ext,
+                vec2 _BL, vec2 _BR, vec2 _TR, vec2 _TL,
+                out vec2 p0, out vec2 p1, out vec2 p2,
+                out ivec3 selected) {
+
+  int jumps_per_div = 0;
+  int xx = 0;
+  int yy = 0;
+  for (int i = level-1; i >= 0; i--) {
+
+    jumps_per_div = i_pow(2,i);
+
+    // pick quad
+    //  - adjust ori, ext
+    //  - adjust bl, br, tr, tl
+    vec2 new_BL, new_BR, new_TR, new_TL;
+    vec2 new_ori, new_ext;
+    vec2 np = p - ori;
+    vec2 dee = ext - ori;
+    vec2 half_dee = 0.5 * dee;
+    if (np.s < half_dee.s) {   // left
+      if (np.t < half_dee.t) { // down
+        new_ori = ori;
+        new_ext = new_ori + half_dee;
+        new_BL = _BL;
+        new_BR = _BL + 0.5 * (_BR - _BL);
+        new_TL = _BL + 0.5 * (_TL - _BL);
+
+        vec2 TTR = _TL + 0.5 * (_TR - _TL);
+        vec2 RTR = _BR + 0.5 * (_TR - _BR);
+        //new_TR = intersect (new_BR, TTR, new_TL, RTR);
+
+        new_TR = new_BR + 0.5 * (TTR - new_BR);
+        //new_TR = new_TL + 0.5 * (_BR - _BL);
+      } else {                 // up
+
+        yy += jumps_per_div;
+
+        new_ori = ori + vec2 (0.0, half_dee.t);
+        new_ext = new_ori + half_dee;
+
+        new_TL = _TL;
+        new_BL = _TL + 0.5 * (_BL - _TL);
+        new_TR = _TL + 0.5 * (_TR - _TL);
+
+        vec2 BBR = _BL + 0.5 * (_BR - _BL);
+        vec2 RBR = _TR + 0.5 * (_BR - _TR);
+        //new_BR = intersect (new_BL, RBR, new_TL, BBR);
+
+        new_BR = new_TR + 0.5 * (BBR - new_TR);
+        //new_BR = new_TR + 0.5 * (_BL - _TL);
+      }
+    } else {                   // right
+
+      xx += jumps_per_div;
+
+      if (np.t < half_dee.t) { // down
+        new_ori = ori + vec2 (half_dee.s, 0.0);
+        new_ext = new_ori + half_dee;
+        new_BR = _BR;
+        new_TR = _BR + 0.5 * (_TR - _BR);
+        new_BL = _BR + 0.5 * (_BL - _BR);
+
+        vec2 TTL = _TR + 0.5 * (_TL - _TR);
+        vec2 LTL = _BL + 0.5 * (_TL - _BL);
+        //new_TL = intersect (new_TR, LTL, new_BL, TTL);
+
+        new_TL = new_BL + 0.5 * (TTL - new_BL);
+        //new_TL = new_BL + 0.5 * (_TR - _BR);
+      } else {                 // up
+
+        yy += jumps_per_div;
+
+        new_ori = ori + half_dee;
+        new_ext = new_ori + half_dee;
+        new_TR = _TR;
+        new_BR = _TR + 0.5 * (_BR - _TR);
+        new_TL = _TR + 0.5 * (_TL - _TR);
+
+        vec2 BBL = _BR + 0.5 * (_BL - _BR);
+        vec2 LBL = _TL + 0.5 * (_BL - _TL);
+        //new_BL = intersect (new_BR, LBL, new_TL, BBL);
+
+        new_BL = new_TL + 0.5 * (BBL - new_TL);
+
+        //new_BL = new_TL + 0.5 * (_BR - _TR);
+      }
+    }
+
+    ori = new_ori;
+    ext = new_ext;
+    _BL = new_BL;
+    _BR = new_BR;
+    _TR = new_TR;
+    _TL = new_TL;
+  }
+
+  selected.x = xx;
+  selected.y = yy;
+
+  // base case -> pick the triangle
+  vec2 np = p - ori;
+  if (np.s > np.t) { // lower
+    p0 = _BL;
+    p1 = _BR;
+    p2 = _TR;
+    selected.z = 0;
+  } else {           // upper
+    p0 = _BL;
+    p1 = _TR;
+    p2 = _TL;
+    selected.z = 1;
+  }
+  return;
+}
+
 void main(void) {
 
   // normalize tex coords to [0, 1] with BL origin
@@ -41,40 +179,39 @@ void main(void) {
   // flip tex coords along y axis
   tc_norm = flip_vec(tc_norm);
 
-  // points of triangle
+  // points of interpolating triangle
   vec2 p0, p1, p2;
 
-  // first, which triangle are we in?
-  bool in_upper_tri = tc_norm.s < tc_norm.t;
-  if (in_upper_tri) {          // upper -> BL -> TR -> TL
-    p0 = vec2 (0, 0);
-    p1 = vec2 (1.0, 1.0);
-    p2 = vec2 (0.0, 1.0);
-  } else {                     // lower : BL -> BR -> TR
-    p0 = vec2 (0, 0);
-    p1 = vec2 (1.0, 0.0);
-    p2 = vec2 (1.0, 1.0);
-  }
+  ivec3 selA, selB;
+
+  // get triangle we're interpolating
+  get_wedge (tri_levels, tc_norm, vec2(0.0,0.0), vec2(1.0, 1.0),
+             vec2(0.0,0.0), vec2(1.0,0.0), vec2(1.0,1.0), vec2(0.0,1.0),
+             p0, p1, p2,
+             selA);
 
   // get barycentric coords
   vec3 bary_coords = compute_bary_coords (tc_norm, p0, p1, p2);
 
-  // compute warped texture coord from bary coords
-  if (in_upper_tri) {
-    p0 = BL;
-    p1 = TR;
-    p2 = TL;
-  } else {
-    p0 = BL;
-    p1 = BR;
-    p2 = TR;
-  }
+  // get corresponding triangle in warped quadrilateral
+  get_wedge (tri_levels, tc_norm, vec2(0.0,0.0), vec2(1.0, 1.0),
+             BL, BR, TR, TL,
+             p0, p1, p2,
+             selB);
 
+  // compute warped texture coord from bary coords
   vec3 xVec = vec3 (p0.x, p1.x, p2.x);
   vec3 yVec = vec3 (p0.y, p1.y, p2.y);
   vec2 warped_tex_coords = vec2 (dot(xVec, bary_coords), dot(yVec, bary_coords));
   warped_tex_coords = flip_vec (warped_tex_coords);
 
   vec4 adj_clr = vec4(1.0 * tc_norm.s * tc_norm.t, 1.0*tc_norm.s, 1.0*tc_norm.t, 1.0);
-  gl_FragColor = texture2D(texture, warped_tex_coords) * adj_clr;
+  adj_clr = vec4 (1.0);
+
+  if (selA != selB)
+    gl_FragColor = vec4 (1.0, 0.0, 0.0, 1.0);
+  else if (selA == ivec3 (1,1,1))
+    gl_FragColor = vec4 (0.0, 1.0, 0.0, 1.0);
+  else
+    gl_FragColor = texture2D(texture, warped_tex_coords) * adj_clr;
 }

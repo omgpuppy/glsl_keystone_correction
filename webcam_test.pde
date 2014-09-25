@@ -1,12 +1,13 @@
 import processing.video.*;
 
-boolean DO_CAPTURE = false;
+boolean DO_CAPTURE = true;
 
 PImage img;
 Capture cam;
 
-PVector TL, BL, BR, TR;
 PShader morph;
+PVector TL, BL, BR, TR;
+int tri_levels;
 
 KeystoneGlyph keyGlyph;
 
@@ -36,9 +37,20 @@ void setup() {
   if (! DO_CAPTURE)
     img = loadImage ("/Users/abrowning/Desktop/silly/ab-glam-shot.png");
 
+  tri_levels = 0;
   morph = loadShader("morph.frag", "morph.vert");
+  morph.set("tri_levels", tri_levels);
 
   keyGlyph = new KeystoneGlyph ();
+  
+  println ("loading calibration data");
+  String[] corners = loadStrings("calib.txt");
+  for (int i = 0, j = 0; i < corners.length; i+=2, j++) {
+    float x = Float.valueOf(corners[i]).floatValue();
+    float y = Float.valueOf(corners[i+1]).floatValue();
+    println (" ["+j+"] : "+x+", "+y);
+    keyGlyph.points.set(j, new PVector (x,y));
+  }
 }
 
 void draw() {
@@ -77,7 +89,7 @@ void draw() {
 
   //morph.set("time", millis() / 1000.0);
   morph.set("texture", px_src);
-  morph.set("resolution", float(px_src.width), float(px_src.height));
+  //morph.set("resolution", float(px_src.width), float(px_src.height));
 
 //  morph.set("TL", 0.0, 0.0);
 //  morph.set("BL", 0.0, 1.0);
@@ -110,6 +122,15 @@ void mousePressed() {
 void mouseReleased() {
   println("UP");
   grabbed = -1;
+  
+  // write out calibration file
+  String[] corners = new String[8];
+  int i = 0;
+  for (PVector p : keyGlyph.points) {
+    corners[i++] = Float.toString(p.x);
+    corners[i++] = Float.toString(p.y);
+  }
+  saveStrings ("calib.txt", corners);
 }
 
 void mouseDragged() {
@@ -118,4 +139,14 @@ void mouseDragged() {
   p.add(new PVector (mouseX-pmouseX, mouseY-pmouseY));
   p = keyGlyph.get_norm_pos(p);
   keyGlyph.points.set(grabbed, p);
+}
+
+void keyPressed() {
+  if (keyCode == UP)
+    tri_levels++;
+  else if (keyCode == DOWN) {
+    if (tri_levels > 0)
+      tri_levels--;
+  }
+  morph.set("tri_levels", tri_levels);
 }
