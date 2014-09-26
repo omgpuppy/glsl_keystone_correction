@@ -3,7 +3,7 @@ import processing.video.*;
 
 // Set this to false if you don't have a webcam installed.
 // A default image will be used instead.
-boolean DO_CAPTURE = false; 
+boolean DO_CAPTURE = true;
 
 // Camera or image source to be corrected
 Capture cam;
